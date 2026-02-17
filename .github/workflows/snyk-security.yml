@@ -38,6 +38,7 @@ jobs:
       # =====================================
       - name: Run Snyk Open Source (SCA)
         run: snyk test --severity-threshold=high
+        working-directory: ./QueueService
 
       # =====================================
       # 3️⃣ Build Container Image
