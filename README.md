@@ -78,4 +78,50 @@ Create appointment with the provided tenant id and service id.
      - `WaitingCount`
      - Currently serving tickets
 
+---
+
+# Flow
+
+## Queue Ticket Creation (UC-Q3)
+
+```mermaid
+sequenceDiagram
+    participant Staff
+    participant AppointmentService as Appointment Service
+    participant ServiceBus as Service Bus
+    participant QueueService as Queue Service
+    participant Redis
+
+    Staff->>AppointmentService: Check-in Appointment
+    AppointmentService->>AppointmentService: Update appointment status
+    AppointmentService->>ServiceBus: Publish appointment_checked_in
+
+    ServiceBus->>QueueService: Deliver appointment_checked_in
+    QueueService->>QueueService: CreateTicket()
+    QueueService->>Redis: ZADD queue
+
+    QueueService->>ServiceBus: Publish ticket_created
+    QueueService->>ServiceBus: Publish queue_updated
+```
+## Counter Calls Next (UC-Q4)
+
+```mermaid
+sequenceDiagram
+    participant Staff
+    participant QueueAPI as Queue API
+    participant QueueService as Queue Service
+    participant Redis
+    participant ServiceBus as Service Bus
+
+    Staff->>QueueAPI: POST /call-next (counterId=C1)
+    QueueAPI->>QueueService: CallNext()
+
+    QueueService->>QueueService: Check active CALLED < maxCounters
+    QueueService->>Redis: ZPOPMAX (atomic dequeue)
+
+    QueueService->>QueueService: Update status = CALLED
+    QueueService->>ServiceBus: Publish ticket_called
+    QueueService->>ServiceBus: Publish queue_updated
+```
+
 
