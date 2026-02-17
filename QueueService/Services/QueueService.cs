@@ -83,7 +83,6 @@ public class QueueService : IQueueService
         return entry;
     }
 
-    // ---------------------------
     // CALL NEXT (Counter-based dequeue)
     // ---------------------------
     public async Task<QueueEntry?> CallNext(
