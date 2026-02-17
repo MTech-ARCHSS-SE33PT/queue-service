@@ -28,8 +28,9 @@ public class QueueController : ControllerBase
         => _service.CallNext(tenantId, serviceId, counterId);
 
     [HttpPost("complete")]
-    public Task Complete(Guid ticketId)
-        => _service.CompleteTicket(ticketId);
+    public Task Complete(Guid queueEntryId)
+        => _service.CompleteTicket(queueEntryId);
+
 
     [HttpGet("status")]
     public Task<object> Status(Guid tenantId, Guid serviceId)

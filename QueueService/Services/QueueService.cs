@@ -11,7 +11,10 @@ public class QueueService : IQueueService
     private readonly IDatabase _redis;
     private readonly IEventPublisher _publisher;
 
+    // Queue configuration per tenant+service
     private static ConcurrentDictionary<string, QueueConfiguration> _configs = new();
+
+    // In-memory ticket store (simulate persistence for now)
     private static ConcurrentDictionary<Guid, QueueEntry> _tickets = new();
 
     public QueueService(RedisConnection redis, IEventPublisher publisher)
@@ -20,18 +23,36 @@ public class QueueService : IQueueService
         _publisher = publisher;
     }
 
-    private string Key(Guid tenantId, Guid serviceId)
+    private string QueueKey(Guid tenantId, Guid serviceId)
         => $"queue:{tenantId}:{serviceId}";
 
+    private string ConfigKey(Guid tenantId, Guid serviceId)
+        => $"{tenantId}:{serviceId}";
+
+    // ---------------------------
+    // CONFIGURE QUEUE
+    // ---------------------------
     public Task Configure(Guid tenantId, Guid serviceId, int maxCounters)
     {
-        _configs[$"{tenantId}:{serviceId}"] =
-            new QueueConfiguration { TenantId = tenantId, ServiceId = serviceId, MaxCounters = maxCounters };
+        _configs[ConfigKey(tenantId, serviceId)] =
+            new QueueConfiguration
+            {
+                TenantId = tenantId,
+                ServiceId = serviceId,
+                MaxCounters = maxCounters
+            };
 
         return Task.CompletedTask;
     }
 
-    public async Task<QueueEntry> CreateTicket(Guid tenantId, Guid serviceId, Guid? appointmentId, int priority)
+    // ---------------------------
+    // CREATE TICKET (Walk-in or Appointment)
+    // ---------------------------
+    public async Task<QueueEntry> CreateTicket(
+        Guid tenantId,
+        Guid serviceId,
+        Guid? appointmentId,
+        int priority)
     {
         var entry = new QueueEntry
         {
@@ -39,66 +60,115 @@ public class QueueService : IQueueService
             ServiceId = serviceId,
             AppointmentId = appointmentId,
             PriorityLevel = priority,
-            TicketNumber = $"T-{DateTime.UtcNow.Ticks % 10000}"
+            TicketNumber = $"T-{DateTime.UtcNow.Ticks % 10000}",
+            Status = "WAITING"
         };
 
         _tickets[entry.QueueEntryId] = entry;
 
-        var score = (priority * 1_000_000) + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var score = (priority * 1_000_000) +
+                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-        await _redis.SortedSetAddAsync(Key(tenantId, serviceId),
-            entry.QueueEntryId.ToString(), score);
+        await _redis.SortedSetAddAsync(
+            QueueKey(tenantId, serviceId),
+            entry.QueueEntryId.ToString(),
+            score);
 
-        await _publisher.PublishAsync("ticket_created", new TicketCreatedEvent(entry));
-        await _publisher.PublishAsync("queue_updated", new QueueUpdatedEvent(tenantId, serviceId));
+        await _publisher.PublishAsync("ticket_created",
+            new TicketCreatedEvent(entry));
+
+        await _publisher.PublishAsync("queue_updated",
+            new QueueUpdatedEvent(tenantId, serviceId));
 
         return entry;
     }
 
-    public async Task<QueueEntry?> CallNext(Guid tenantId, Guid serviceId, string counterId)
+    // ---------------------------
+    // CALL NEXT (Counter-based dequeue)
+    // ---------------------------
+    public async Task<QueueEntry?> CallNext(
+        Guid tenantId,
+        Guid serviceId,
+        string counterId)
     {
+        var configKey = ConfigKey(tenantId, serviceId);
+
+        if (!_configs.TryGetValue(configKey, out var config))
+            throw new Exception("Queue not configured.");
+
+        // Count active serving tickets
+        var activeServing = _tickets.Values.Count(x =>
+            x.TenantId == tenantId &&
+            x.ServiceId == serviceId &&
+            x.Status == "CALLED");
+
+        if (activeServing >= config.MaxCounters)
+            throw new Exception("All counters are busy.");
+
+        // Atomic pop from Redis (highest priority first)
         var result = await _redis.SortedSetPopAsync(
-            Key(tenantId, serviceId),
+            QueueKey(tenantId, serviceId),
             Order.Descending);
 
         if (result == null || result.Value.Element.IsNull)
             return null;
 
-        var id = Guid.Parse(result.Value.Element!);
+        var ticketId = Guid.Parse(result.Value.Element!);
 
-        var ticket = _tickets[id];
+        if (!_tickets.TryGetValue(ticketId, out var ticket))
+            return null;
 
         ticket.Status = "CALLED";
         ticket.CounterId = counterId;
         ticket.CalledAt = DateTime.UtcNow;
 
-        await _publisher.PublishAsync("ticket_called", new TicketCalledEvent(ticket));
-        await _publisher.PublishAsync("queue_updated", new QueueUpdatedEvent(tenantId, serviceId));
+        await _publisher.PublishAsync("ticket_called",
+            new TicketCalledEvent(ticket));
+
+        await _publisher.PublishAsync("queue_updated",
+            new QueueUpdatedEvent(tenantId, serviceId));
 
         return ticket;
     }
 
-    public async Task CompleteTicket(Guid ticketId)
+    // ---------------------------
+    // COMPLETE TICKET
+    // ---------------------------
+    public async Task CompleteTicket(Guid queueEntryId)
     {
-        if (_tickets.TryGetValue(ticketId, out var ticket))
-        {
-            ticket.Status = "SERVED";
-            ticket.ServedAt = DateTime.UtcNow;
+        if (!_tickets.TryGetValue(queueEntryId, out var ticket))
+        throw new Exception("Queue entry not found.");
 
-            await _publisher.PublishAsync("ticket_completed", new TicketCompletedEvent(ticket));
-            await _publisher.PublishAsync("queue_updated",
-                new QueueUpdatedEvent(ticket.TenantId, ticket.ServiceId));
-        }
+
+        ticket.Status = "SERVED";
+        ticket.ServedAt = DateTime.UtcNow;
+
+        await _publisher.PublishAsync("ticket_completed",
+            new TicketCompletedEvent(ticket));
+
+        await _publisher.PublishAsync("queue_updated",
+            new QueueUpdatedEvent(ticket.TenantId, ticket.ServiceId));
     }
 
+    // ---------------------------
+    // GET QUEUE STATUS (Dashboard)
+    // ---------------------------
     public async Task<object> GetStatus(Guid tenantId, Guid serviceId)
     {
-        var waiting = await _redis.SortedSetLengthAsync(Key(tenantId, serviceId));
-        var serving = _tickets.Values
-            .Where(x => x.TenantId == tenantId &&
-                        x.ServiceId == serviceId &&
-                        x.Status == "CALLED");
+        var waitingCount = await _redis.SortedSetLengthAsync(
+            QueueKey(tenantId, serviceId));
 
-        return new { WaitingCount = waiting, Serving = serving };
+        var servingTickets = _tickets.Values
+            .Where(x =>
+                x.TenantId == tenantId &&
+                x.ServiceId == serviceId &&
+                x.Status == "CALLED")
+            .ToList();
+
+        return new
+        {
+            WaitingCount = waitingCount,
+            Serving = servingTickets
+        };
     }
 }
