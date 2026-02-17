@@ -49,3 +49,20 @@ jobs:
       # =====================================
       - name: Scan container image
         run: snyk container test my-app:latest --severity-threshold=high
+
+      - name: Run Snyk Code (SARIF)
+        run: snyk code test --sarif-file-output=snyk-code.sarif
+
+      - name: Upload SAST SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+
+      - name: Scan container (SARIF)
+        run: snyk container test my-app:latest --sarif-file-output=snyk-container.sarif
+      
+      - name: Upload container SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-container.sarif
+
