@@ -1,0 +1,51 @@
+name: Snyk Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  snyk-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ---- Install Snyk CLI ----
+      - name: Setup Node (required for Snyk CLI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Snyk
+        run: npm install -g snyk
+
+      - name: Authenticate Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
+
+      # =====================================
+      # 1️⃣ SAST (Snyk Code)
+      # =====================================
+      - name: Run Snyk Code (SAST)
+        run: snyk code test --severity-threshold=high
+
+      # =====================================
+      # 2️⃣ SCA (Dependencies)
+      # =====================================
+      - name: Run Snyk Open Source (SCA)
+        run: snyk test --severity-threshold=high
+
+      # =====================================
+      # 3️⃣ Build Container Image
+      # =====================================
+      - name: Build Docker image
+        run: docker build -t my-app:latest .
+
+      # =====================================
+      # 4️⃣ Container Image Scan
+      # =====================================
+      - name: Scan container image
+        run: snyk container test my-app:latest --severity-threshold=high
