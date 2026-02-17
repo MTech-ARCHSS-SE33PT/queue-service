@@ -19,7 +19,7 @@ Purpose: Core queue lifecycle and operations.
 
 ## Notes
 
-Currently using a mock in-memory event publisher (API calls) for adding a dummy appointment and performing basic operations.
+Currently using a mock in-memory event publisher (API calls) for adding a dummy appointments and performing basic operations.
 
 ---
 
@@ -30,7 +30,6 @@ Currently using a mock in-memory event publisher (API calls) for adding a dummy 
 - Docker Desktop installed
 - .NET 8 SDK (.NET 10 works as well)
 
----
 
 ## Run Using Docker 
 
@@ -39,6 +38,7 @@ Currently using a mock in-memory event publisher (API calls) for adding a dummy 
    ```bash
    cd QueueService
    docker compose up --build
+   ```
 ---
 
 ## Open Swagger UI in Browser
