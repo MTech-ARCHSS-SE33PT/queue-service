@@ -45,15 +45,18 @@ jobs:
       # =====================================
       - name: Build Docker image
         run: docker build -t my-app:latest .
+        working-directory: ./QueueService
 
       # =====================================
       # 4️⃣ Container Image Scan
       # =====================================
       - name: Scan container image
         run: snyk container test my-app:latest --severity-threshold=high
+        working-directory: ./QueueService
 
       - name: Run Snyk Code (SARIF)
         run: snyk code test --sarif-file-output=snyk-code.sarif
+        working-directory: ./QueueService
 
       - name: Upload SAST SARIF
         uses: github/codeql-action/upload-sarif@v3
