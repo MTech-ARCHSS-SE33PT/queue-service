@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   snyk-security:
@@ -14,7 +15,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ---- Install Snyk CLI ----
       - name: Setup Node (required for Snyk CLI)
         uses: actions/setup-node@v4
         with:
@@ -27,16 +27,21 @@ jobs:
         run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
       # =====================================
-      # 1️⃣ SAST (Snyk Code)
+      # 1️⃣ SAST (Snyk Code + SARIF)
       # =====================================
-      - name: Run Snyk Code (SAST)
-        run: snyk code test --severity-threshold=high
+      - name: Run Snyk Code
+        run: snyk code test --severity-threshold=high --sarif-file-output=snyk-code.sarif
         working-directory: ./QueueService
+
+      - name: Upload SAST SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ./QueueService/snyk-code.sarif
 
       # =====================================
       # 2️⃣ SCA (Dependencies)
       # =====================================
-      - name: Run Snyk Open Source (SCA)
+      - name: Run Snyk Open Source
         run: snyk test --severity-threshold=high
         working-directory: ./QueueService
 
@@ -48,26 +53,13 @@ jobs:
         working-directory: ./QueueService
 
       # =====================================
-      # 4️⃣ Container Image Scan
+      # 4️⃣ Container Scan (with SARIF)
       # =====================================
       - name: Scan container image
-        run: snyk container test my-app:latest --severity-threshold=high
+        run: snyk container test my-app:latest --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk-container.sarif
         working-directory: ./QueueService
 
-      - name: Run Snyk Code (SARIF)
-        run: snyk code test --sarif-file-output=snyk-code.sarif
-        working-directory: ./QueueService
-
-      - name: Upload SAST SARIF
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-code.sarif
-
-      - name: Scan container (SARIF)
-        run: snyk container test my-app:latest --sarif-file-output=snyk-container.sarif
-      
       - name: Upload container SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-container.sarif
-
+          sarif_file: ./QueueService/snyk-container.sarif
