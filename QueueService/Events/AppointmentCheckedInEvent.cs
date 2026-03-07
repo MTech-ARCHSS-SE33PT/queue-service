@@ -1,11 +1,11 @@
-namespace QueueService.Models;
+using QueueService.Models;
+namespace QueueService.Events;
 
 public record AppointmentCheckedInEvent(
     Guid TenantId,
     Guid ServiceId,
     Guid AppointmentId,
     int PriorityLevel);
-
 public record TicketCreatedEvent(QueueEntry Ticket);
 public record TicketCalledEvent(QueueEntry Ticket);
 public record TicketCompletedEvent(QueueEntry Ticket);
