@@ -210,8 +210,3 @@ dist/
 
 # Local development
 .local/
-
-# Secrets
-secrets.json
-appsettings.*.json
-!appsettings.json
