@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QueueService.Models;
+using QueueService.DTOs;
 
 namespace QueueService.Repositories;
 
@@ -9,6 +10,12 @@ public interface IQueueRepository
 
     Task UpdateAsync(Guid tenantId, Guid serviceId, int maxCounters);
 Task DeleteAsync(Guid tenantId, Guid serviceId);
+Task<List<QueueEntry>> GetTicketsByTenantAsync(Guid tenantId);
+Task<int?> GetMaxCountersAsync(Guid tenantId, Guid serviceId);
+Task<List<StaffTicketDto>> GetStaffTicketsAsync(Guid tenantId, Guid serviceId);
+Task<QueueEntry?> GetNextWaitingTicketAsync(
+    Guid tenantId,
+    Guid serviceId);
 
     Task<QueueEntry> CreateTicketAsync(
         Guid tenantId,
