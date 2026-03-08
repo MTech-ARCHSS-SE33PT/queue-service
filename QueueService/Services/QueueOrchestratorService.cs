@@ -50,7 +50,15 @@ public class QueueOrchestratorService
         await _redis.EnqueueAsync(ticket);
 
         await _publisher.PublishAsync("ticket_created",
-            new TicketCreatedEvent(ticket));
+            new TicketCreatedEvent(
+                ticket.Id,
+                ticket.TenantId,
+                ticket.ServiceId,
+                ticket.AppointmentId,
+                ticket.TicketNumber,
+                ticket.PriorityLevel,
+                ticket.EnqueuedAt
+            ));
 
         await _publisher.PublishAsync("queue_updated",
             new QueueUpdatedEvent(tenantId, serviceId));
@@ -62,27 +70,51 @@ public class QueueOrchestratorService
     // CALL NEXT
     // ============================
     public async Task<QueueEntryDto?> CallNext(
-        Guid tenantId,
-        Guid serviceId,
-        string counterId)
+    Guid tenantId,
+    Guid serviceId,
+    string counterId)
+{
+    // 🚨 Check if this counter already has active ticket
+    var servingTickets = await _repository.GetServingTicketsAsync(
+        tenantId, serviceId);
+
+    var alreadyServing = servingTickets
+        .FirstOrDefault(t => t.CounterId == counterId);
+
+    if (alreadyServing != null)
     {
-        var ticketId = await _redis.DequeueNextAsync(tenantId, serviceId);
-
-        if (ticketId == null)
-            return null;
-
-        var ticket = await _repository.MarkAsCalledAsync(
-            ticketId.Value, counterId);
-
-        await _publisher.PublishAsync("ticket_called",
-            new TicketCalledEvent(ticket));
-
-        await _publisher.PublishAsync("queue_updated",
-            new QueueUpdatedEvent(tenantId, serviceId));
-
-        return Map(ticket);
+        throw new InvalidOperationException(
+            "This counter is already serving a ticket.");
     }
 
+    var ticketId = await _redis.DequeueNextAsync(tenantId, serviceId);
+
+    if (ticketId == null)
+    {
+        var nextFromDb = await _repository
+            .GetNextWaitingTicketAsync(tenantId, serviceId);
+
+        if (nextFromDb == null)
+            return null;
+
+        ticketId = nextFromDb.Id;
+    }
+
+    var ticket = await _repository
+        .MarkAsCalledAsync(ticketId.Value, counterId);
+
+    await _publisher.PublishAsync("ticket_called",
+        new TicketCalledEvent(
+            ticket.Id,
+            ticket.CounterId,
+            ticket.CalledAt
+        ));
+
+    await _publisher.PublishAsync("queue_updated",
+        new QueueUpdatedEvent(tenantId, serviceId));
+
+    return Map(ticket);
+}
     // ============================
     // COMPLETE
     // ============================
@@ -91,7 +123,10 @@ public class QueueOrchestratorService
         var ticket = await _repository.MarkAsCompletedAsync(queueEntryId);
 
         await _publisher.PublishAsync("ticket_completed",
-            new TicketCompletedEvent(ticket));
+            new TicketCompletedEvent(
+                ticket.Id,
+                ticket.ServedAt
+            ));
 
         await _publisher.PublishAsync("queue_updated",
             new QueueUpdatedEvent(ticket.TenantId, ticket.ServiceId));
@@ -118,7 +153,7 @@ public class QueueOrchestratorService
     }
 
     // ============================
-    // TENANT VIEW
+    // TENANT VIEW (CONFIGURATIONS)
     // ============================
     public async Task<List<QueueConfigurationDto>> GetQueuesByTenantAsync(Guid tenantId)
     {
@@ -131,20 +166,85 @@ public class QueueOrchestratorService
             ServiceName = q.ServiceName,
             LocationName = q.LocationName,
             MaxCounters = q.MaxCounters,
-            Entries = q.QueueEntries.Select(e => new QueueEntryDto
-            {
-                Id = e.Id,
-                TicketNumber = e.TicketNumber,
-                PriorityLevel = e.PriorityLevel,
-                Status = e.Status,
-                CounterId = e.CounterId,
-                EnqueuedAt = e.EnqueuedAt,
-                CalledAt = e.CalledAt,
-                ServedAt = e.ServedAt
-            }).ToList()
+            Entries = q.QueueEntries.Select(Map).ToList()
         }).ToList();
     }
 
+    // ============================
+    // ✅ STAFF TICKETS (CLEAN VERSION)
+    // ============================
+    public async Task<List<StaffTicketDto>> GetStaffTicketsAsync(
+        Guid tenantId,
+        Guid serviceId)
+    {
+        return await _repository.GetStaffTicketsAsync(tenantId, serviceId);
+    }
+
+    // ============================
+    // BASIC TICKET VIEW
+    // ============================
+    public async Task<List<QueueEntryDto>> GetTicketsByTenantAsync(Guid tenantId)
+    {
+        var tickets = await _repository.GetTicketsByTenantAsync(tenantId);
+        return tickets.Select(Map).ToList();
+    }
+
+    public async Task<int?> GetMaxCountersAsync(Guid tenantId, Guid serviceId)
+    {
+        return await _repository.GetMaxCountersAsync(tenantId, serviceId);
+    }
+
+    public async Task Update(Guid tenantId, Guid serviceId, int maxCounters)
+    {
+        await _repository.UpdateAsync(tenantId, serviceId, maxCounters);
+    }
+
+    public async Task Delete(Guid tenantId, Guid serviceId)
+    {
+        await _repository.DeleteAsync(tenantId, serviceId);
+        await _redis.RemoveQueueAsync(tenantId, serviceId);
+    }
+
+    // ============================
+    // COUNTER MANAGEMENT
+    // ============================
+    public async Task<(bool Success, string? Error)> SetCounterAsync(
+        Guid tenantId,
+        Guid serviceId,
+        string userId,
+        string counterNumber)
+    {
+        var maxCounters = await _repository.GetMaxCountersAsync(tenantId, serviceId);
+
+        if (maxCounters == null)
+            return (false, "Queue configuration not found.");
+
+        return await _redis.SetCounterAsync(
+            tenantId,
+            serviceId,
+            userId,
+            counterNumber,
+            maxCounters.Value);
+    }
+
+    public async Task RemoveCounterAsync(
+        Guid tenantId,
+        Guid serviceId,
+        string userId)
+    {
+        await _redis.RemoveCounterAsync(tenantId, serviceId, userId);
+    }
+
+    public async Task<Dictionary<string, string>> GetActiveCountersAsync(
+        Guid tenantId,
+        Guid serviceId)
+    {
+        return await _redis.GetActiveCountersAsync(tenantId, serviceId);
+    }
+
+    // ============================
+    // MAPPER
+    // ============================
     private static QueueEntryDto Map(QueueEntry entry)
     {
         return new QueueEntryDto
@@ -159,15 +259,4 @@ public class QueueOrchestratorService
             ServedAt = entry.ServedAt
         };
     }
-
-    public async Task Update(Guid tenantId, Guid serviceId, int maxCounters)
-{
-    await _repository.UpdateAsync(tenantId, serviceId, maxCounters);
-}
-
-public async Task Delete(Guid tenantId, Guid serviceId)
-{
-    await _repository.DeleteAsync(tenantId, serviceId);
-    await _redis.RemoveQueueAsync(tenantId, serviceId);
-}
 }

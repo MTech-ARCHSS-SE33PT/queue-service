@@ -64,9 +64,76 @@ public class RedisQueueService : IRedisQueueService
             queueEntryId.ToString());
     }
 
-public async Task RemoveQueueAsync(Guid tenantId, Guid serviceId)
-{
-    await _redis.KeyDeleteAsync(
-        QueueKey(tenantId, serviceId));
-}
+    public async Task RemoveQueueAsync(Guid tenantId, Guid serviceId)
+    {
+        await _redis.KeyDeleteAsync(
+            QueueKey(tenantId, serviceId));
+    }
+
+    // ============================
+    // COUNTER MANAGEMENT (USER AWARE)
+    // ============================
+    public async Task<(bool Success, string? Error)> SetCounterAsync(
+        Guid tenantId,
+        Guid serviceId,
+        string userId,
+        string counterNumber,
+        int maxCounters)
+    {
+        var counterKey = $"queue:{tenantId}:{serviceId}:counter-map";
+        var userKey = $"queue:{tenantId}:{serviceId}:user-map";
+
+        // Validate counter range
+        if (!int.TryParse(counterNumber, out var number))
+            return (false, "Invalid counter number.");
+
+        if (number < 1 || number > maxCounters)
+            return (false, "Counter out of range.");
+
+        // Check if user already has a counter
+        var existingCounter = await _redis.HashGetAsync(userKey, userId);
+        if (!existingCounter.IsNullOrEmpty)
+            return (false, $"User already assigned to counter {existingCounter}.");
+
+        // Check if counter already taken
+        var existingUser = await _redis.HashGetAsync(counterKey, counterNumber);
+        if (!existingUser.IsNullOrEmpty)
+            return (false, "Counter already taken.");
+
+        // Assign both mappings
+        await _redis.HashSetAsync(counterKey, counterNumber, userId);
+        await _redis.HashSetAsync(userKey, userId, counterNumber);
+
+        return (true, null);
+    }
+
+    public async Task RemoveCounterAsync(
+        Guid tenantId,
+        Guid serviceId,
+        string userId)
+    {
+        var counterKey = $"queue:{tenantId}:{serviceId}:counter-map";
+        var userKey = $"queue:{tenantId}:{serviceId}:user-map";
+
+        var counterNumber = await _redis.HashGetAsync(userKey, userId);
+
+        if (!counterNumber.IsNullOrEmpty)
+        {
+            await _redis.HashDeleteAsync(counterKey, counterNumber);
+            await _redis.HashDeleteAsync(userKey, userId);
+        }
+    }
+
+    public async Task<Dictionary<string, string>> GetActiveCountersAsync(
+        Guid tenantId,
+        Guid serviceId)
+    {
+        var counterKey = $"queue:{tenantId}:{serviceId}:counter-map";
+
+        var entries = await _redis.HashGetAllAsync(counterKey);
+
+        return entries.ToDictionary(
+            x => x.Name.ToString(),
+            x => x.Value.ToString());
+    }
 }
