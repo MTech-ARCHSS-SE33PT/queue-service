@@ -142,3 +142,7 @@ C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\Q
 C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\obj\Debug\net8.0\QueueService.pdb
 C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\obj\Debug\net8.0\QueueService.genruntimeconfig.cache
 C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\obj\Debug\net8.0\ref\QueueService.dll
+C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\bin\Debug\net8.0\Azure.Core.Amqp.dll
+C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\bin\Debug\net8.0\Azure.Messaging.ServiceBus.dll
+C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\bin\Debug\net8.0\Microsoft.Azure.Amqp.dll
+C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\queue-service\QueueService\bin\Debug\net8.0\System.ClientModel.dll

@@ -9,6 +9,11 @@ Purpose: Core queue lifecycle and operations.
 - UC-Q4: Call Next Ticket (Staff advances queue)
 - UC-Q6: Real-time Queue Status (Public dashboard reads current serving number + waiting list)
 
+## Counter Release (Staff)
+
+- `DELETE /api/queue/release-counter-if-idle` releases a staff member from their assigned counter only if that counter has no `CALLED` ticket.
+- `DELETE /api/queue/release-counter` force-releases a staff member from their counter (no serving-ticket check).
+
 ## Incomplete Use Cases
 
 - UC-Q2: Configure Capacity / Service Counters (Admin sets number of counters, operating hours)  

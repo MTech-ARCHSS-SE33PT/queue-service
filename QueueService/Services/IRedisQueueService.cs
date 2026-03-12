@@ -26,6 +26,11 @@ Task RemoveCounterAsync(
     Guid serviceId,
     string userId);
 
+Task<string?> GetUserCounterAsync(
+    Guid tenantId,
+    Guid serviceId,
+    string userId);
+
 Task<Dictionary<string, string>> GetActiveCountersAsync(
     Guid tenantId,
     Guid serviceId);

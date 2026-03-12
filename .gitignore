@@ -203,3 +203,6 @@ dist/
 
 # Local development
 .local/
+appsettings.*.local.json
+appsettings.Local.json
+.env

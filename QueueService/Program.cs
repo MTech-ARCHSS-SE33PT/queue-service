@@ -1,3 +1,4 @@
+using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
 using QueueService.Repositories;
 using QueueService.Infrastructure;
@@ -12,7 +13,36 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<RedisConnection>();
 builder.Services.AddSingleton<IEventBus, InMemoryEventBus>();
-builder.Services.AddSingleton<IEventPublisher, ConsoleEventPublisher>();
+builder.Services.AddSingleton<ConsoleEventPublisher>();
+builder.Services.AddSingleton<IEventPublisher>(sp => sp.GetRequiredService<ConsoleEventPublisher>());
+
+// Optional: Azure Service Bus integration (safe when not configured)
+var sbConn = ServiceBusConfig.GetConnectionString(builder.Configuration);
+var sbTopic = ServiceBusConfig.GetTopic(builder.Configuration);
+var sbSubscription = ServiceBusConfig.GetSubscription(builder.Configuration);
+
+if (!string.IsNullOrWhiteSpace(sbConn) && !string.IsNullOrWhiteSpace(sbTopic))
+{
+    try
+    {
+        _ = ServiceBusConnectionStringProperties.Parse(sbConn);
+
+        builder.Services.AddSingleton(_ => new ServiceBusClient(sbConn));
+        builder.Services.AddSingleton<ServiceBusEventPublisher>();
+        builder.Services.AddSingleton<IEventPublisher>(sp =>
+            new TeeEventPublisher(
+                sp.GetRequiredService<ConsoleEventPublisher>(),
+                sp.GetRequiredService<ServiceBusEventPublisher>(),
+                sp.GetRequiredService<ILogger<TeeEventPublisher>>()));
+
+        if (!string.IsNullOrWhiteSpace(sbSubscription))
+            builder.Services.AddHostedService<AppointmentCheckedInServiceBusConsumer>();
+    }
+    catch
+    {
+        // Invalid connection string; keep defaults (in-memory + console) without crashing the service.
+    }
+}
 
 // ==========================
 // DATABASE

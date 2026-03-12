@@ -368,6 +368,77 @@ public class QueueOrchestratorServiceTests
     }
 
     [Fact]
+    public async Task ReleaseCounterIfIdleAsync_ShouldReturnNotAssigned_WhenUserHasNoCounter()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var serviceId = Guid.NewGuid();
+        var userId = "user1";
+
+        _mockRedis.Setup(r => r.GetUserCounterAsync(tenantId, serviceId, userId))
+            .ReturnsAsync((string?)null);
+
+        // Act
+        var result = await _service.ReleaseCounterIfIdleAsync(tenantId, serviceId, userId);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("User is not assigned to any counter.", result.Error);
+        _mockRedis.Verify(r => r.RemoveCounterAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReleaseCounterIfIdleAsync_ShouldReturnServing_WhenCounterHasCalledTicket()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var serviceId = Guid.NewGuid();
+        var userId = "user1";
+        var counterNumber = "1";
+
+        _mockRedis.Setup(r => r.GetUserCounterAsync(tenantId, serviceId, userId))
+            .ReturnsAsync(counterNumber);
+
+        _mockRepository.Setup(r => r.GetServingTicketsAsync(tenantId, serviceId))
+            .ReturnsAsync(new List<QueueEntry>
+            {
+                new QueueEntry { CounterId = counterNumber, Status = "CALLED" }
+            });
+
+        // Act
+        var result = await _service.ReleaseCounterIfIdleAsync(tenantId, serviceId, userId);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("Counter is currently serving a ticket.", result.Error);
+        _mockRedis.Verify(r => r.RemoveCounterAsync(tenantId, serviceId, userId), Times.Never);
+    }
+
+    [Fact]
+    public async Task ReleaseCounterIfIdleAsync_ShouldRemoveCounter_WhenIdle()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var serviceId = Guid.NewGuid();
+        var userId = "user1";
+        var counterNumber = "1";
+
+        _mockRedis.Setup(r => r.GetUserCounterAsync(tenantId, serviceId, userId))
+            .ReturnsAsync(counterNumber);
+
+        _mockRepository.Setup(r => r.GetServingTicketsAsync(tenantId, serviceId))
+            .ReturnsAsync(new List<QueueEntry>());
+
+        // Act
+        var result = await _service.ReleaseCounterIfIdleAsync(tenantId, serviceId, userId);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Null(result.Error);
+        _mockRedis.Verify(r => r.RemoveCounterAsync(tenantId, serviceId, userId), Times.Once);
+    }
+
+    [Fact]
     public async Task GetActiveCountersAsync_ShouldReturnFromRedis()
     {
         // Arrange

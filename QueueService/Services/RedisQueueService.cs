@@ -124,6 +124,20 @@ public class RedisQueueService : IRedisQueueService
         }
     }
 
+    public async Task<string?> GetUserCounterAsync(
+        Guid tenantId,
+        Guid serviceId,
+        string userId)
+    {
+        var userKey = $"queue:{tenantId}:{serviceId}:user-map";
+        var counterNumber = await _redis.HashGetAsync(userKey, userId);
+
+        if (counterNumber.IsNullOrEmpty)
+            return null;
+
+        return counterNumber.ToString();
+    }
+
     public async Task<Dictionary<string, string>> GetActiveCountersAsync(
         Guid tenantId,
         Guid serviceId)

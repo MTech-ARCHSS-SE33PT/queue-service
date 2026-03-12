@@ -169,6 +169,26 @@ public async Task<IActionResult> ReleaseCounter(
 
     return Ok();
 }
+
+[HttpDelete("release-counter-if-idle")]
+public async Task<IActionResult> ReleaseCounterIfIdle(
+    [FromQuery] Guid tenantId,
+    [FromQuery] Guid serviceId,
+    [FromQuery] string userId)
+{
+    var result = await _orchestrator.ReleaseCounterIfIdleAsync(
+        tenantId, serviceId, userId);
+
+    if (!result.Success)
+    {
+        if (result.Error == "Counter is currently serving a ticket.")
+            return Conflict(result.Error);
+
+        return NotFound(result.Error);
+    }
+
+    return Ok();
+}
 [HttpGet("staff-tickets")]
 public async Task<IActionResult> GetStaffTickets(
     [FromQuery] Guid tenantId,

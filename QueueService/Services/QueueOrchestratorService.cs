@@ -235,6 +235,28 @@ public class QueueOrchestratorService
         await _redis.RemoveCounterAsync(tenantId, serviceId, userId);
     }
 
+    public async Task<(bool Success, string? Error)> ReleaseCounterIfIdleAsync(
+        Guid tenantId,
+        Guid serviceId,
+        string userId)
+    {
+        var counterNumber = await _redis.GetUserCounterAsync(
+            tenantId, serviceId, userId);
+
+        if (string.IsNullOrWhiteSpace(counterNumber))
+            return (false, "User is not assigned to any counter.");
+
+        var servingTickets = await _repository.GetServingTicketsAsync(
+            tenantId, serviceId);
+
+        var isServing = servingTickets.Any(t => t.CounterId == counterNumber);
+        if (isServing)
+            return (false, "Counter is currently serving a ticket.");
+
+        await _redis.RemoveCounterAsync(tenantId, serviceId, userId);
+        return (true, null);
+    }
+
     public async Task<Dictionary<string, string>> GetActiveCountersAsync(
         Guid tenantId,
         Guid serviceId)

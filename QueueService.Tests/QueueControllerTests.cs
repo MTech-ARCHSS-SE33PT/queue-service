@@ -3,19 +3,32 @@ using Moq;
 using Microsoft.AspNetCore.Mvc;
 using QueueService.Controllers;
 using QueueService.Services;
+using QueueService.Repositories;
+using QueueService.Events;
 using QueueService.DTOs;
+using QueueService.Models;
 
 namespace QueueService.Tests;
 
 public class QueueControllerTests
 {
-    private readonly Mock<QueueOrchestratorService> _mockOrchestrator;
+    private readonly Mock<IQueueRepository> _mockRepository;
+    private readonly Mock<IRedisQueueService> _mockRedis;
+    private readonly Mock<IEventPublisher> _mockPublisher;
     private readonly QueueController _controller;
 
     public QueueControllerTests()
     {
-        _mockOrchestrator = new Mock<QueueOrchestratorService>();
-        _controller = new QueueController(_mockOrchestrator.Object);
+        _mockRepository = new Mock<IQueueRepository>();
+        _mockRedis = new Mock<IRedisQueueService>();
+        _mockPublisher = new Mock<IEventPublisher>();
+
+        var orchestrator = new QueueOrchestratorService(
+            _mockRepository.Object,
+            _mockRedis.Object,
+            _mockPublisher.Object);
+
+        _controller = new QueueController(orchestrator);
     }
 
     [Fact]
@@ -28,15 +41,13 @@ public class QueueControllerTests
         var locationName = "Test Location";
         var maxCounters = 5;
 
-        _mockOrchestrator.Setup(o => o.Configure(tenantId, serviceId, serviceName, locationName, maxCounters))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _controller.Configure(tenantId, serviceId, serviceName, locationName, maxCounters);
 
         // Assert
         Assert.IsType<OkResult>(result);
-        _mockOrchestrator.Verify(o => o.Configure(tenantId, serviceId, serviceName, locationName, maxCounters), Times.Once);
+        _mockRepository.Verify(r => r.ConfigureAsync(
+            tenantId, serviceId, serviceName, locationName, maxCounters), Times.Once);
     }
 
     [Fact]
@@ -54,25 +65,32 @@ public class QueueControllerTests
             Priority = 1
         };
 
-        var expectedResult = new QueueEntryDto
+        var ticket = new QueueEntry
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            ServiceId = serviceId,
+            AppointmentId = appointmentId,
             TicketNumber = "A001",
             PriorityLevel = 1,
-            Status = "WAITING"
+            Status = "WAITING",
+            EnqueuedAt = DateTime.UtcNow
         };
 
-        _mockOrchestrator.Setup(o => o.CreateTicket(tenantId, serviceId, appointmentId, 1))
-            .ReturnsAsync(expectedResult);
+        _mockRepository.Setup(r => r.CreateTicketAsync(tenantId, serviceId, appointmentId, 1))
+            .ReturnsAsync(ticket);
+        _mockRedis.Setup(r => r.EnqueueAsync(ticket)).Returns(Task.CompletedTask);
+        _mockPublisher.Setup(p => p.PublishAsync(It.IsAny<string>(), It.IsAny<object>()))
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _controller.Create(request);
 
         // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returnedDto = Assert.IsType<QueueEntryDto>(okResult.Value);
-        Assert.Equal(expectedResult.Id, returnedDto.Id);
-        Assert.Equal(expectedResult.TicketNumber, returnedDto.TicketNumber);
+        Assert.Equal(ticket.Id, returnedDto.Id);
+        Assert.Equal(ticket.TicketNumber, returnedDto.TicketNumber);
     }
 
     [Fact]
@@ -83,24 +101,34 @@ public class QueueControllerTests
         var serviceId = Guid.NewGuid();
         var counterId = "Counter1";
 
-        var expectedTicket = new QueueEntryDto
+        var ticketId = Guid.NewGuid();
+        var calledTicket = new QueueEntry
         {
-            Id = Guid.NewGuid(),
+            Id = ticketId,
+            TenantId = tenantId,
+            ServiceId = serviceId,
             TicketNumber = "A001",
             Status = "CALLED",
-            CounterId = counterId
+            CounterId = counterId,
+            CalledAt = DateTime.UtcNow
         };
 
-        _mockOrchestrator.Setup(o => o.CallNext(tenantId, serviceId, counterId))
-            .ReturnsAsync(expectedTicket);
+        _mockRepository.Setup(r => r.GetServingTicketsAsync(tenantId, serviceId))
+            .ReturnsAsync(new List<QueueEntry>());
+        _mockRedis.Setup(r => r.DequeueNextAsync(tenantId, serviceId))
+            .ReturnsAsync(ticketId);
+        _mockRepository.Setup(r => r.MarkAsCalledAsync(ticketId, counterId))
+            .ReturnsAsync(calledTicket);
+        _mockPublisher.Setup(p => p.PublishAsync(It.IsAny<string>(), It.IsAny<object>()))
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _controller.Call(tenantId, serviceId, counterId);
 
         // Assert
-        var okResult = Assert.IsType<OkObjectResult>(result);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returnedTicket = Assert.IsType<QueueEntryDto>(okResult.Value);
-        Assert.Equal(expectedTicket.Id, returnedTicket.Id);
+        Assert.Equal(calledTicket.Id, returnedTicket.Id);
         Assert.Equal(counterId, returnedTicket.CounterId);
     }
 
@@ -112,14 +140,18 @@ public class QueueControllerTests
         var serviceId = Guid.NewGuid();
         var counterId = "Counter1";
 
-        _mockOrchestrator.Setup(o => o.CallNext(tenantId, serviceId, counterId))
-            .ReturnsAsync((QueueEntryDto?)null);
+        _mockRepository.Setup(r => r.GetServingTicketsAsync(tenantId, serviceId))
+            .ReturnsAsync(new List<QueueEntry>());
+        _mockRedis.Setup(r => r.DequeueNextAsync(tenantId, serviceId))
+            .ReturnsAsync((Guid?)null);
+        _mockRepository.Setup(r => r.GetNextWaitingTicketAsync(tenantId, serviceId))
+            .ReturnsAsync((QueueEntry?)null);
 
         // Act
         var result = await _controller.Call(tenantId, serviceId, counterId);
 
         // Assert
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
         Assert.Equal("No waiting tickets.", notFoundResult.Value);
     }
 
@@ -131,15 +163,18 @@ public class QueueControllerTests
         var serviceId = Guid.NewGuid();
         var counterId = "Counter1";
 
-        _mockOrchestrator.Setup(o => o.CallNext(tenantId, serviceId, counterId))
-            .ThrowsAsync(new InvalidOperationException("Counter is busy"));
+        _mockRepository.Setup(r => r.GetServingTicketsAsync(tenantId, serviceId))
+            .ReturnsAsync(new List<QueueEntry>
+            {
+                new QueueEntry { CounterId = counterId, Status = "CALLED" }
+            });
 
         // Act
         var result = await _controller.Call(tenantId, serviceId, counterId);
 
         // Assert
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("Counter is busy", badRequestResult.Value);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal("This counter is already serving a ticket.", badRequestResult.Value);
     }
 
     [Fact]
@@ -148,7 +183,15 @@ public class QueueControllerTests
         // Arrange
         var queueEntryId = Guid.NewGuid();
 
-        _mockOrchestrator.Setup(o => o.CompleteTicket(queueEntryId))
+        _mockRepository.Setup(r => r.MarkAsCompletedAsync(queueEntryId))
+            .ReturnsAsync(new QueueEntry
+            {
+                Id = queueEntryId,
+                TenantId = Guid.NewGuid(),
+                ServiceId = Guid.NewGuid(),
+                ServedAt = DateTime.UtcNow
+            });
+        _mockPublisher.Setup(p => p.PublishAsync(It.IsAny<string>(), It.IsAny<object>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -156,7 +199,7 @@ public class QueueControllerTests
 
         // Assert
         Assert.IsType<OkResult>(result);
-        _mockOrchestrator.Verify(o => o.CompleteTicket(queueEntryId), Times.Once);
+        _mockRepository.Verify(r => r.MarkAsCompletedAsync(queueEntryId), Times.Once);
     }
 
     [Fact]
@@ -166,17 +209,19 @@ public class QueueControllerTests
         var tenantId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
 
-        var expectedStatus = new { WaitingCount = 5, Serving = new List<object>() };
-
-        _mockOrchestrator.Setup(o => o.GetStatus(tenantId, serviceId))
-            .ReturnsAsync(expectedStatus);
+        _mockRedis.Setup(r => r.GetWaitingCountAsync(tenantId, serviceId))
+            .ReturnsAsync(5);
+        _mockRepository.Setup(r => r.GetServingTicketsAsync(tenantId, serviceId))
+            .ReturnsAsync(new List<QueueEntry>());
 
         // Act
         var result = await _controller.Status(tenantId, serviceId);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        Assert.Equal(expectedStatus, okResult.Value);
+        Assert.NotNull(okResult.Value);
+        var valueType = okResult.Value!.GetType();
+        Assert.Equal(5L, valueType.GetProperty("WaitingCount")!.GetValue(okResult.Value));
     }
 
     [Fact]
@@ -187,15 +232,13 @@ public class QueueControllerTests
         var serviceId = Guid.NewGuid();
         var maxCounters = 10;
 
-        _mockOrchestrator.Setup(o => o.Update(tenantId, serviceId, maxCounters))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _controller.Update(tenantId, serviceId, maxCounters);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.Equal("Queue updated successfully.", okResult.Value);
+        _mockRepository.Verify(r => r.UpdateAsync(tenantId, serviceId, maxCounters), Times.Once);
     }
 
     [Fact]
@@ -221,14 +264,13 @@ public class QueueControllerTests
         var tenantId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
 
-        _mockOrchestrator.Setup(o => o.Delete(tenantId, serviceId))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _controller.Delete(tenantId, serviceId);
 
         // Assert
-        Assert.IsType<OkResult>(result);
-        _mockOrchestrator.Verify(o => o.Delete(tenantId, serviceId), Times.Once);
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("Queue deleted successfully.", okResult.Value);
+        _mockRepository.Verify(r => r.DeleteAsync(tenantId, serviceId), Times.Once);
+        _mockRedis.Verify(r => r.RemoveQueueAsync(tenantId, serviceId), Times.Once);
     }
 }
