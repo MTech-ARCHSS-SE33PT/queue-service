@@ -4520,11 +4520,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Standalone\\OneDrive - Mediacorp Pte Ltd\\Documents\\MTECH\\queue-service\\QueueService\\QueueService.csproj",
+      "projectUniqueName": "C:\\Users\\Standalone\\OneDrive - Mediacorp Pte Ltd\\Documents\\MTECH\\Frontend\\queue-service\\QueueService\\QueueService.csproj",
       "projectName": "QueueService",
-      "projectPath": "C:\\Users\\Standalone\\OneDrive - Mediacorp Pte Ltd\\Documents\\MTECH\\queue-service\\QueueService\\QueueService.csproj",
+      "projectPath": "C:\\Users\\Standalone\\OneDrive - Mediacorp Pte Ltd\\Documents\\MTECH\\Frontend\\queue-service\\QueueService\\QueueService.csproj",
       "packagesPath": "C:\\Users\\Standalone\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Standalone\\OneDrive - Mediacorp Pte Ltd\\Documents\\MTECH\\queue-service\\QueueService\\obj\\",
+      "outputPath": "C:\\Users\\Standalone\\OneDrive - Mediacorp Pte Ltd\\Documents\\MTECH\\Frontend\\queue-service\\QueueService\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Standalone\\AppData\\Roaming\\NuGet\\NuGet.Config",
