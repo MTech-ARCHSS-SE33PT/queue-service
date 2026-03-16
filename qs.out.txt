@@ -1,0 +1,82 @@
+Using launch settings from QueueService\Properties\launchSettings.json...
+Building...
+C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Events\InMemoryEventBus.cs(20,31): warning CS8604: Possible null reference argument for parameter 'arg' in 'Task Func<object, Task>.Invoke(object arg)'. [C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\QueueService.csproj]
+C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Infrastructure\RedisConnection.cs(13,13): warning CS8604: Possible null reference argument for parameter 'configuration' in 'ConnectionMultiplexer ConnectionMultiplexer.Connect(string configuration, TextWriter? log = null)'. [C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\QueueService.csproj]
+info: QueueService.Infrastructure.ServiceBus.ServiceBusInboundSubscriber[0]
+      Starting Service Bus processor...
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5239
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService
+fail: QueueService.Infrastructure.ServiceBus.ServiceBusInboundSubscriber[0]
+      Failed processing Service Bus message. Subject=appointment_checked_in MessageId=faf8686cf715498d878692d0b0afa8ff
+      System.ArgumentNullException: Value cannot be null. (Parameter 'configuration')
+         at StackExchange.Redis.ConfigurationOptions.DoParse(String configuration, Boolean ignoreUnknown) in /_/src/StackExchange.Redis/ConfigurationOptions.cs:line 991
+         at StackExchange.Redis.ConfigurationOptions.Parse(String configuration, Boolean ignoreUnknown) in /_/src/StackExchange.Redis/ConfigurationOptions.cs:line 795
+         at StackExchange.Redis.ConfigurationOptions.Parse(String configuration) in /_/src/StackExchange.Redis/ConfigurationOptions.cs:line 785
+         at StackExchange.Redis.ConnectionMultiplexer.Connect(String configuration, TextWriter log) in /_/src/StackExchange.Redis/ConnectionMultiplexer.cs:line 639
+         at QueueService.Infrastructure.RedisConnection..ctor(IConfiguration config) in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Infrastructure\RedisConnection.cs:line 12
+         at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+         at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+         at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+         at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSiteMain(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+         at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+         at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+         at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Program.cs:line 134
+      --- End of stack trace from previous location ---
+         at QueueService.Events.InMemoryEventBus.Publish[T](T event) in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Events\InMemoryEventBus.cs:line 20
+         at QueueService.Infrastructure.ServiceBus.ServiceBusInboundSubscriber.OnMessage(ProcessMessageEventArgs args) in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Infrastructure\ServiceBus\ServiceBusInboundSubscriber.cs:line 83
+fail: QueueService.Infrastructure.ServiceBus.ServiceBusInboundSubscriber[0]
+      Failed processing Service Bus message. Subject=appointment_checked_in MessageId=16146e507a404516afce7ed1492efd32
+      System.ArgumentNullException: Value cannot be null. (Parameter 'configuration')
+         at StackExchange.Redis.ConfigurationOptions.DoParse(String configuration, Boolean ignoreUnknown) in /_/src/StackExchange.Redis/ConfigurationOptions.cs:line 991
+         at StackExchange.Redis.ConfigurationOptions.Parse(String configuration, Boolean ignoreUnknown) in /_/src/StackExchange.Redis/ConfigurationOptions.cs:line 795
+         at StackExchange.Redis.ConfigurationOptions.Parse(String configuration) in /_/src/StackExchange.Redis/ConfigurationOptions.cs:line 785
+         at StackExchange.Redis.ConnectionMultiplexer.Connect(String configuration, TextWriter log) in /_/src/StackExchange.Redis/ConnectionMultiplexer.cs:line 639
+         at QueueService.Infrastructure.RedisConnection..ctor(IConfiguration config) in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Infrastructure\RedisConnection.cs:line 12
+         at InvokeStub_RedisConnection..ctor(Object, Span`1)
+         at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+         at System.Reflection.RuntimeConstructorInfo.Invoke(BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitCache(ServiceCallSite callSite, RuntimeResolverContext context, ServiceProviderEngineScope serviceProviderEngine, RuntimeResolverLock lockType)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitScopeCache(ServiceCallSite callSite, RuntimeResolverContext context)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteVisitor`2.VisitCallSite(ServiceCallSite callSite, TArgument argument)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.Resolve(ServiceCallSite callSite, ServiceProviderEngineScope scope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.DynamicServiceProviderEngine.<>c__DisplayClass2_0.<RealizeService>b__0(ServiceProviderEngineScope scope)
+         at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+         at Microsoft.Extensions.DependencyInjection.ServiceLookup.ServiceProviderEngineScope.GetService(Type serviceType)
+         at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+         at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+         at Program.<>c__DisplayClass0_0.<<<Main>$>b__4>d.MoveNext() in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Program.cs:line 134
+      --- End of stack trace from previous location ---
+         at QueueService.Events.InMemoryEventBus.Publish[T](T event) in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Events\InMemoryEventBus.cs:line 20
+         at QueueService.Infrastructure.ServiceBus.ServiceBusInboundSubscriber.OnMessage(ProcessMessageEventArgs args) in C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\queue-service\QueueService\Infrastructure\ServiceBus\ServiceBusInboundSubscriber.cs:line 83

@@ -49,7 +49,20 @@ public async Task<QueueEntry?> GetNextWaitingTicketAsync(
                 q.ServiceId == serviceId);
 
         if (config == null)
-            throw new Exception("Queue not configured for this service.");
+        {
+            config = new QueueConfiguration
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                ServiceId = serviceId,
+                ServiceName = $"Auto:{serviceId}",
+                LocationName = "Auto",
+                MaxCounters = 1
+            };
+
+            _context.QueueConfigurations.Add(config);
+            await _context.SaveChangesAsync();
+        }
 
         // 2️⃣ Create queue entry with proper FK
         var ticket = new QueueEntry

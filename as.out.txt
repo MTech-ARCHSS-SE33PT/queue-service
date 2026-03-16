@@ -1,0 +1,13 @@
+Using launch settings from C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\appointment-service\AppointmentService.Api\Properties\launchSettings.json...
+Building...
+Sample Appointment ID: dd00f144-fa44-4527-ba26-b92686040d90
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5263
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\Standalone\OneDrive - Mediacorp Pte Ltd\Documents\MTECH\Frontend\appointment-service\AppointmentService.Api
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.

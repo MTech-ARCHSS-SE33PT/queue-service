@@ -21,6 +21,15 @@ Purpose: Core queue lifecycle and operations.
 
 Currently using a mock in-memory event publisher (API calls) for adding a dummy appointments and performing basic operations.
 
+## Service Bus connectivity check
+
+This service does not yet consume Azure Service Bus events directly (it uses an in-memory `IEventBus`), but you can verify your Service Bus connection from the API:
+
+- Set `ServiceBus:ConnectionString` (or `ConnectionStrings:ServiceBus`) in `QueueService/appsettings.json` or via environment variables.
+- Optional: set `ServiceBus:QueueName` (or `ServiceBus:TopicName` + `ServiceBus:SubscriptionName`) to validate via a non-destructive peek.
+- For topic/subscription integration, you can also use env vars: `ASB_CONN`, `ASB_TOPIC`, `ASB_SUB`.
+- Call `GET /api/health/servicebus` in Swagger to see `ok=true/false`.
+
 ---
 
 # Installation & Setup
