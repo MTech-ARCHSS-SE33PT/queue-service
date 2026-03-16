@@ -63,6 +63,8 @@ public class QueueOrchestratorService
         await _publisher.PublishAsync("queue_updated",
             new QueueUpdatedEvent(tenantId, serviceId));
 
+        await PublishPositionMilestoneIfNeededAsync(ticket, positionAhead: 3);
+
         return Map(ticket);
     }
 
@@ -112,6 +114,8 @@ public class QueueOrchestratorService
 
     await _publisher.PublishAsync("queue_updated",
         new QueueUpdatedEvent(tenantId, serviceId));
+
+    await PublishPositionMilestoneIfNeededAsync(tenantId, serviceId, positionAhead: 3);
 
     return Map(ticket);
 }
@@ -258,5 +262,55 @@ public class QueueOrchestratorService
             CalledAt = entry.CalledAt,
             ServedAt = entry.ServedAt
         };
+    }
+
+    private async Task PublishPositionMilestoneIfNeededAsync(QueueEntry ticket, int positionAhead)
+    {
+        var ahead = await _redis.GetPositionAheadAsync(ticket.TenantId, ticket.ServiceId, ticket.Id);
+        if (ahead is null || ahead.Value != positionAhead)
+            return;
+
+        var firstTime = await _redis.MarkMilestoneNotifiedAsync(ticket.TenantId, ticket.ServiceId, ticket.Id, positionAhead);
+        if (!firstTime)
+            return;
+
+        await _publisher.PublishAsync(
+            "QueuePositionChanged",
+            new QueuePositionChangedEnvelope(
+                EventId: Guid.NewGuid(),
+                EventType: "QueuePositionChanged",
+                TenantId: ticket.TenantId,
+                OccurredAt: DateTime.UtcNow,
+                Data: new QueuePositionChangedData(
+                    TicketNo: ticket.TicketNumber,
+                    Position: positionAhead,
+                    Customer: new QueueCustomer(null, null))));
+    }
+
+    private async Task PublishPositionMilestoneIfNeededAsync(Guid tenantId, Guid serviceId, int positionAhead)
+    {
+        var ticketId = await _redis.GetTicketIdAtPositionAheadAsync(tenantId, serviceId, positionAhead);
+        if (ticketId is null)
+            return;
+
+        var firstTime = await _redis.MarkMilestoneNotifiedAsync(tenantId, serviceId, ticketId.Value, positionAhead);
+        if (!firstTime)
+            return;
+
+        var ticket = await _repository.GetTicketByIdAsync(ticketId.Value);
+        if (ticket is null)
+            return;
+
+        await _publisher.PublishAsync(
+            "QueuePositionChanged",
+            new QueuePositionChangedEnvelope(
+                EventId: Guid.NewGuid(),
+                EventType: "QueuePositionChanged",
+                TenantId: tenantId,
+                OccurredAt: DateTime.UtcNow,
+                Data: new QueuePositionChangedData(
+                    TicketNo: ticket.TicketNumber,
+                    Position: positionAhead,
+                    Customer: new QueueCustomer(null, null))));
     }
 }

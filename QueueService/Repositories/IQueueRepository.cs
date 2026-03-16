@@ -35,4 +35,6 @@ Task<QueueEntry?> GetNextWaitingTicketAsync(
     string serviceName, string locationName, int maxCounters);
 
 Task<QueueEntry> MarkAsCompletedAsync(Guid queueEntryId);
+
+    Task<QueueEntry?> GetTicketByIdAsync(Guid queueEntryId);
 }

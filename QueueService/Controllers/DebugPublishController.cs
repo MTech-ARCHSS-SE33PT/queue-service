@@ -41,5 +41,21 @@ public class DebugPublishController : ControllerBase
         await _publisher.PublishAsync("ticket_called", evt);
         return Ok(new { ok = true, published = "ticket_called", payload = evt });
     }
-}
 
+    [HttpPost("queue-position-changed")]
+    public async Task<IActionResult> PublishQueuePositionChanged([FromBody] QueuePositionChangedEnvelope? envelope)
+    {
+        envelope ??= new QueuePositionChangedEnvelope(
+            EventId: Guid.NewGuid(),
+            EventType: "QueuePositionChanged",
+            TenantId: Guid.NewGuid(),
+            OccurredAt: DateTime.UtcNow,
+            Data: new QueuePositionChangedData(
+                TicketNo: $"Q-{Random.Shared.Next(1, 999):D3}",
+                Position: Random.Shared.Next(1, 20),
+                Customer: new QueueCustomer("Ben", "+6591234567")));
+
+        await _publisher.PublishAsync("QueuePositionChanged", envelope);
+        return Ok(new { ok = true, published = "QueuePositionChanged", payload = envelope });
+    }
+}

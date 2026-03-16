@@ -237,4 +237,10 @@ public async Task<List<StaffTicketDto>> GetStaffTicketsAsync(
         .ToListAsync();
 }
 
+    public async Task<QueueEntry?> GetTicketByIdAsync(Guid queueEntryId)
+    {
+        return await _context.QueueEntries
+            .FirstOrDefaultAsync(x => x.Id == queueEntryId);
+    }
+
 }

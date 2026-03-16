@@ -8,6 +8,7 @@ public sealed class InMemoryRedisQueueService : IRedisQueueService
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, long>> _queues = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, string>> _counterMaps = new();
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, string>> _userMaps = new();
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, byte>> _milestones = new();
 
     private static string QueueKey(Guid tenantId, Guid serviceId)
         => $"queue:{tenantId}:{serviceId}";
@@ -17,6 +18,9 @@ public sealed class InMemoryRedisQueueService : IRedisQueueService
 
     private static string UserKey(Guid tenantId, Guid serviceId)
         => $"queue:{tenantId}:{serviceId}:user-map";
+
+    private static string MilestoneKey(Guid tenantId, Guid serviceId, int positionAhead)
+        => $"queue:{tenantId}:{serviceId}:milestone:{positionAhead}:notified";
 
     public Task RemoveQueueAsync(Guid tenantId, Guid serviceId)
     {
@@ -60,6 +64,57 @@ public sealed class InMemoryRedisQueueService : IRedisQueueService
             : (Guid?)null);
     }
 
+    public Task<int?> GetPositionAheadAsync(Guid tenantId, Guid serviceId, Guid queueEntryId)
+    {
+        var key = QueueKey(tenantId, serviceId);
+        if (!_queues.TryGetValue(key, out var queue) || queue.IsEmpty)
+            return Task.FromResult<int?>(null);
+
+        if (!queue.TryGetValue(queueEntryId, out var thisScore))
+            return Task.FromResult<int?>(null);
+
+        var ahead = 0;
+        foreach (var kvp in queue)
+        {
+            if (kvp.Key == queueEntryId) continue;
+            if (kvp.Value > thisScore) ahead++;
+        }
+
+        return Task.FromResult<int?>(ahead);
+    }
+
+    public Task<Guid?> GetTicketIdAtPositionAheadAsync(Guid tenantId, Guid serviceId, int positionAhead)
+    {
+        if (positionAhead < 0)
+            return Task.FromResult<Guid?>(null);
+
+        var key = QueueKey(tenantId, serviceId);
+        if (!_queues.TryGetValue(key, out var queue) || queue.IsEmpty)
+            return Task.FromResult<Guid?>(null);
+
+        var ordered = queue
+            .OrderByDescending(x => x.Value)
+            .Select(x => x.Key)
+            .ToList();
+
+        if (positionAhead >= ordered.Count)
+            return Task.FromResult<Guid?>(null);
+
+        return Task.FromResult<Guid?>(ordered[positionAhead]);
+    }
+
+    public Task<bool> MarkMilestoneNotifiedAsync(Guid tenantId, Guid serviceId, Guid queueEntryId, int positionAhead)
+    {
+        if (positionAhead < 0)
+            return Task.FromResult(false);
+
+        var set = _milestones.GetOrAdd(
+            MilestoneKey(tenantId, serviceId, positionAhead),
+            _ => new ConcurrentDictionary<Guid, byte>());
+
+        return Task.FromResult(set.TryAdd(queueEntryId, 0));
+    }
+
     public Task<long> GetWaitingCountAsync(Guid tenantId, Guid serviceId)
     {
         var key = QueueKey(tenantId, serviceId);
@@ -86,10 +141,10 @@ public sealed class InMemoryRedisQueueService : IRedisQueueService
         int maxCounters)
     {
         if (!int.TryParse(counterNumber, out var number))
-            return Task.FromResult((false, "Invalid counter number."));
+            return Task.FromResult((false, (string?)"Invalid counter number."));
 
         if (number < 1 || number > maxCounters)
-            return Task.FromResult((false, "Counter out of range."));
+            return Task.FromResult((false, (string?)"Counter out of range."));
 
         var counterKey = CounterKey(tenantId, serviceId);
         var userKey = UserKey(tenantId, serviceId);
@@ -98,19 +153,19 @@ public sealed class InMemoryRedisQueueService : IRedisQueueService
         var userMap = _userMaps.GetOrAdd(userKey, _ => new ConcurrentDictionary<string, string>());
 
         if (userMap.TryGetValue(userId, out var existingCounter))
-            return Task.FromResult((false, $"User already assigned to counter {existingCounter}."));
+            return Task.FromResult((false, (string?)$"User already assigned to counter {existingCounter}."));
 
         if (counterMap.ContainsKey(counterNumber))
-            return Task.FromResult((false, "Counter already taken."));
+            return Task.FromResult((false, (string?)"Counter already taken."));
 
         if (!counterMap.TryAdd(counterNumber, userId))
-            return Task.FromResult((false, "Counter already taken."));
+            return Task.FromResult((false, (string?)"Counter already taken."));
 
         if (!userMap.TryAdd(userId, counterNumber))
         {
             counterMap.TryRemove(counterNumber, out _);
             userMap.TryGetValue(userId, out var currentCounter);
-            return Task.FromResult((false, $"User already assigned to counter {currentCounter ?? "?"}."));
+            return Task.FromResult((false, (string?)$"User already assigned to counter {currentCounter ?? "?"}."));
         }
 
         return Task.FromResult((true, (string?)null));

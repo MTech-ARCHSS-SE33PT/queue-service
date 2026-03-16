@@ -16,6 +16,9 @@ public class RedisQueueService : IRedisQueueService
     private string QueueKey(Guid tenantId, Guid serviceId)
         => $"queue:{tenantId}:{serviceId}";
 
+    private static string MilestoneKey(Guid tenantId, Guid serviceId, int positionAhead)
+        => $"queue:{tenantId}:{serviceId}:milestone:{positionAhead}:notified";
+
     // ============================
     // ADD TICKET TO REDIS QUEUE
     // ============================
@@ -68,6 +71,43 @@ public class RedisQueueService : IRedisQueueService
     {
         await _redis.KeyDeleteAsync(
             QueueKey(tenantId, serviceId));
+    }
+
+    public async Task<int?> GetPositionAheadAsync(Guid tenantId, Guid serviceId, Guid queueEntryId)
+    {
+        var rank = await _redis.SortedSetRankAsync(
+            QueueKey(tenantId, serviceId),
+            queueEntryId.ToString(),
+            Order.Descending);
+
+        return rank is null ? null : (int)rank.Value;
+    }
+
+    public async Task<Guid?> GetTicketIdAtPositionAheadAsync(Guid tenantId, Guid serviceId, int positionAhead)
+    {
+        if (positionAhead < 0)
+            return null;
+
+        var values = await _redis.SortedSetRangeByRankAsync(
+            QueueKey(tenantId, serviceId),
+            positionAhead,
+            positionAhead,
+            Order.Descending);
+
+        if (values.Length == 0 || values[0].IsNullOrEmpty)
+            return null;
+
+        return Guid.TryParse(values[0].ToString(), out var id) ? id : null;
+    }
+
+    public Task<bool> MarkMilestoneNotifiedAsync(Guid tenantId, Guid serviceId, Guid queueEntryId, int positionAhead)
+    {
+        if (positionAhead < 0)
+            return Task.FromResult(false);
+
+        return _redis.SetAddAsync(
+            MilestoneKey(tenantId, serviceId, positionAhead),
+            queueEntryId.ToString());
     }
 
     // ============================
