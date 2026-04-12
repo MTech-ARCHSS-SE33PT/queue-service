@@ -1,0 +1,64 @@
+name: Build and Deploy Queue Service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ACR_NAME: queuexacr111414
+  ACR_LOGIN_SERVER: queuexacr111414.azurecr.io
+  AKS_RESOURCE_GROUP: queuex-rg
+  AKS_CLUSTER_NAME: queuex-aks
+  K8S_NAMESPACE: queuex-dev
+  IMAGE_NAME: queue-service
+  DEPLOYMENT_NAME: queue-service
+  CONTAINER_NAME: queue-service
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Build and push image
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -t "$ACR_LOGIN_SERVER/$IMAGE_NAME:dev" \
+            -f QueueService/Dockerfile \
+            QueueService \
+            --push
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group "$AKS_RESOURCE_GROUP" \
+            --name "$AKS_CLUSTER_NAME" \
+            --overwrite-existing
+
+      - name: Force latest image pull and restart
+        run: |
+          kubectl patch deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" --type='strategic' \
+            -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"$CONTAINER_NAME\",\"imagePullPolicy\":\"Always\"}]}}}}"
+          kubectl rollout restart deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE"
+          kubectl rollout status deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" --timeout=180s
