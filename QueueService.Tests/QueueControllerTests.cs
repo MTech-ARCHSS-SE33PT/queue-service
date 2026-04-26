@@ -69,7 +69,7 @@ public class QueueControllerTests
 
         var result = await _controller.Create(request);
 
-        var okResult = Assert.IsType<OkObjectResult>(result);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returnedDto = Assert.IsType<QueueEntryDto>(okResult.Value);
         Assert.Equal(ticket.Id, returnedDto.Id);
         Assert.Equal(ticket.TicketNumber, returnedDto.TicketNumber);
@@ -103,7 +103,7 @@ public class QueueControllerTests
 
         var result = await _controller.Call(tenantId, serviceId, counterId);
 
-        var okResult = Assert.IsType<OkObjectResult>(result);
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
         var returnedTicket = Assert.IsType<QueueEntryDto>(okResult.Value);
         Assert.Equal(ticket.Id, returnedTicket.Id);
         Assert.Equal(counterId, returnedTicket.CounterId);
@@ -125,7 +125,7 @@ public class QueueControllerTests
 
         var result = await _controller.Call(tenantId, serviceId, counterId);
 
-        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
         Assert.Equal("No waiting tickets.", notFoundResult.Value);
     }
 
@@ -141,7 +141,7 @@ public class QueueControllerTests
 
         var result = await _controller.Call(tenantId, serviceId, counterId);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
         Assert.Equal("This counter is already serving a ticket.", badRequestResult.Value);
     }
 
