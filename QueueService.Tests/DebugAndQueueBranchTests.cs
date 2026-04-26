@@ -95,6 +95,7 @@ public sealed class DebugAndQueueBranchTests
         repository.SetupSequence(r => r.GetMaxCountersAsync(tenantId, serviceId))
             .ReturnsAsync((int?)null)
             .ReturnsAsync(2)
+            .ReturnsAsync(2)
             .ReturnsAsync(2);
         repository.Setup(r => r.GetStaffTicketsAsync(tenantId, serviceId)).ReturnsAsync(staffTickets);
         redis.SetupSequence(r => r.SetCounterAsync(tenantId, serviceId, "staff-1", "1", 2))
