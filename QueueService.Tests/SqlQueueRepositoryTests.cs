@@ -105,15 +105,18 @@ public class SqlQueueRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateTicketAsync_ShouldThrowWhenNoConfiguration()
+    public async Task CreateTicketAsync_ShouldCreateDefaultConfigurationWhenMissing()
     {
-        // Arrange
         var tenantId = Guid.NewGuid();
         var serviceId = Guid.NewGuid();
 
-        // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() =>
-            _repository.CreateTicketAsync(tenantId, serviceId, null, 1));
+        var ticket = await _repository.CreateTicketAsync(tenantId, serviceId, null, 1);
+
+        var config = await _context.QueueConfigurations
+            .SingleOrDefaultAsync(q => q.TenantId == tenantId && q.ServiceId == serviceId);
+        Assert.NotNull(config);
+        Assert.Equal(config!.Id, ticket.QueueConfigurationId);
+        Assert.Equal("Auto", config.LocationName);
     }
 
     [Fact]
