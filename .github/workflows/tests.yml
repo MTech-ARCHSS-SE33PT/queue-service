@@ -1,0 +1,77 @@
+name: Tests and Coverage
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore QueueService.Tests/QueueService.Tests.csproj
+
+      - name: Test with coverage
+        run: >
+          dotnet test QueueService.Tests/QueueService.Tests.csproj
+          --configuration Release
+          --no-restore
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults
+          --logger "trx;LogFileName=test-results.trx"
+
+      - name: Add coverage to job summary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import xml.etree.ElementTree as ET
+
+          reports = sorted(Path("TestResults").glob("**/coverage.cobertura.xml"))
+          if not reports:
+              raise SystemExit("No coverage.cobertura.xml file found")
+
+          lines_covered = lines_valid = branches_covered = branches_valid = 0
+          for report in reports:
+              root = ET.parse(report).getroot()
+              lines_covered += int(root.attrib.get("lines-covered", "0"))
+              lines_valid += int(root.attrib.get("lines-valid", "0"))
+              branches_covered += int(root.attrib.get("branches-covered", "0"))
+              branches_valid += int(root.attrib.get("branches-valid", "0"))
+
+          line_rate = (lines_covered / lines_valid * 100) if lines_valid else 0
+          branch_rate = (branches_covered / branches_valid * 100) if branches_valid else 0
+          summary = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary.write_text(
+              "## Test Coverage\n\n"
+              "| Metric | Coverage | Covered | Total |\n"
+              "| --- | ---: | ---: | ---: |\n"
+              f"| Lines | {line_rate:.2f}% | {lines_covered} | {lines_valid} |\n"
+              f"| Branches | {branch_rate:.2f}% | {branches_covered} | {branches_valid} |\n"
+              "\nCobertura XML and TRX results are attached as workflow artifacts.\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload test and coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-and-coverage-results
+          path: TestResults
