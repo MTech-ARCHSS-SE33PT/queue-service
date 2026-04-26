@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'QueueService/**'
+      - 'QueueService.sln'
   workflow_dispatch:
 
 permissions:
@@ -11,6 +14,7 @@ permissions:
   id-token: write
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ACR_NAME: queuexacr111414
   ACR_LOGIN_SERVER: queuexacr111414.azurecr.io
   AKS_RESOURCE_GROUP: queuex-rg
@@ -62,4 +66,13 @@ jobs:
           kubectl patch deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" --type='strategic' \
             -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"$CONTAINER_NAME\",\"imagePullPolicy\":\"Always\"}]}}}}"
           kubectl rollout restart deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE"
-          kubectl rollout status deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" --timeout=180s
+          kubectl rollout status deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" --timeout=300s
+
+      - name: Show rollout diagnostics
+        if: failure()
+        run: |
+          kubectl get deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" -o wide || true
+          kubectl describe deployment "$DEPLOYMENT_NAME" -n "$K8S_NAMESPACE" || true
+          kubectl get pods -n "$K8S_NAMESPACE" -o wide || true
+          kubectl describe pods -n "$K8S_NAMESPACE" -l app="$DEPLOYMENT_NAME" || true
+          kubectl logs -n "$K8S_NAMESPACE" -l app="$DEPLOYMENT_NAME" --all-containers --tail=100 || true
